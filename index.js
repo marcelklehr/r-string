@@ -25,14 +25,6 @@
 var RArray   = require('r-array')
 var inherits = require('util').inherits
 
-function split(str) {
-  return str.split('\n').map(function (l, i, a) {
-    if(i != a.length - 1)
-      return l + '\n'
-    return l
-  })
-}
-
 module.exports = RString
 
 inherits(RString, RArray)
