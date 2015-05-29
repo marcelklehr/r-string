@@ -55,14 +55,54 @@ R.remove = function(at, length) {
   this.splice(at, length)
 }
 
+R.setText = function(newval) {
+  var oldval = this.text()
+
+  // The following code is taken from shareJS:
+  // https://github.com/share/ShareJS/blob/3843b26831ecb781344fb9beb1005cfdd2/lib/client/textarea.js
+
+  if (oldval === newval) return;
+
+  var commonStart = 0;
+  while (oldval.charAt(commonStart) === newval.charAt(commonStart)) {
+    commonStart++;
+  }
+  var commonEnd = 0;
+  while (oldval.charAt(oldval.length - 1 - commonEnd) === newval.charAt(newval.length - 1 - commonEnd) &&
+    commonEnd + commonStart < oldval.length && commonEnd + commonStart < newval.length) {
+    commonEnd++;
+  }
+  if (oldval.length !== commonStart + commonEnd) {
+    this.remove(commonStart, oldval.length - commonStart - commonEnd);
+  }
+  if (newval.length !== commonStart + commonEnd) {
+    this.insertString(commonStart, newval.slice(commonStart, newval.length - commonEnd));
+  }
+}
+
 R.wrapTextinput = function(textarea) {
-  var r = this
+  var rstring = this
   
   // Set current value
-  textarea.value = r.text()
+  textarea.value = rstring.text()
   
   var start
     , end
+
+  this.on('preupdate', onPreupdate)
+  this.on('_update'  , on_update)
+
+  // Update text on events
+
+  var eventNames = ['textInput', /*'keydown',*/ 'keyup', 'cut', 'paste', 'drop', 'dragend'];
+  for (var i = 0; i < eventNames.length; i++) {
+    var e = eventNames[i];
+    if (textarea.addEventListener) {
+      textarea.addEventListener(e, genOp, false);
+    } else {
+      textarea.attachEvent('on' + e, genOp);
+    }
+  }
   
   function onPreupdate (ch) {
   
@@ -73,8 +113,8 @@ R.wrapTextinput = function(textarea) {
     end   = textarea.selectionEnd
     
     //what atom contains the cursor?
-    var startKey = r.keys[start]
-      , endKey = r.keys[end]
+    var startKey =rstring.keys[start]
+      , endKey = rstring.keys[end]
     
     //how much will be inserted into the document?
     for(var key in ch) {
@@ -91,12 +131,11 @@ R.wrapTextinput = function(textarea) {
     start = start + cursorStart
     end   = end   + cursorEnd
   }
-  this.on('preupdate', onPreupdate)
 
   function on_update (update) {
-    if(update[2] !== r.id) {
+    if(update[2] !== rstring.id) {
       // set value
-      oldval = textarea.value = r.text()
+      oldval = textarea.value = rstring.text()
       
       // fix selection
       textarea.selectionStart = start
@@ -105,54 +144,11 @@ R.wrapTextinput = function(textarea) {
       //textarea.dispatchEvent(new window.Event('input')) // XXX: What for?
     }
   }
-  this.on('_update'  , on_update)
-  
-  
-  // Collect changes
-  
-  var oldval = r.text()
-    , collectingChangesLock = false
-  
-  function collectChanges() {
-    var newval = textarea.value
 
-    // The following code is taken from shareJS:
-    // https://github.com/share/ShareJS/blob/3843b26831ecb781344fb9beb1005cfdd2/lib/client/textarea.js
-
-    if (oldval === newval) return;
-
-    var commonStart = 0;
-    while (oldval.charAt(commonStart) === newval.charAt(commonStart)) {
-      commonStart++;
-    }
-    var commonEnd = 0;
-    while (oldval.charAt(oldval.length - 1 - commonEnd) === newval.charAt(newval.length - 1 - commonEnd) &&
-      commonEnd + commonStart < oldval.length && commonEnd + commonStart < newval.length) {
-      commonEnd++;
-    }
-    if (oldval.length !== commonStart + commonEnd) {
-      r.remove(commonStart, oldval.length - commonStart - commonEnd);
-    }
-    if (newval.length !== commonStart + commonEnd) {
-      r.insertString(commonStart, newval.slice(commonStart, newval.length - commonEnd));
-    }
-
-    oldval = newval
-  }
-
-  var eventNames = ['textInput', /*'keydown',*/ 'keyup', 'cut', 'paste', 'drop', 'dragend'];
-  for (var i = 0; i < eventNames.length; i++) {
-    var e = eventNames[i];
-    if (textarea.addEventListener) {
-      textarea.addEventListener(e, genOp, false);
-    } else {
-      textarea.attachEvent('on' + e, genOp);
-    }
-  }
   function genOp(evt) {
-    console.log(evt)
-    collectChanges()
+    rstring.setText(textarea.value)
   }
   
   return this
 }
+
